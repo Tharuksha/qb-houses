@@ -133,7 +133,7 @@ local function GetHouseStreetCount(street)
 end
 
 local function isHouseOwned(house)
-    local result = MySQL.query.await('SELECT owned FROM houselocations WHERE name = ?', {house})
+    local result = MySQL.Sync.fetchAll('SELECT owned FROM houselocations WHERE name = ?', {house})
     if result[1] then
         if result[1].owned == 1 then
             return true
@@ -636,6 +636,30 @@ QBCore.Functions.CreateCallback('qb-phone:server:GetHouseKeys', function(source,
     cb(MyKeys)
 end)
 
+RegisterNetEvent('qb-houses:server:TierChange', function(house, tier)
+    local src = source
+    local Player = QBCore.Functions.GetPlayer(src)
+    if not Player then return end
+    if Player.PlayerData.job.name ~= 'realestate' then return end
+    if Player.PlayerData.job.grade.level < 3 then return end
+    if tier > 24 then -- Your highest tier
+        TriggerClientEvent('QBCore:Notify', src, "This tier does not exist..", "error")
+        return
+    end
+
+    if Config.Houses[house] then
+        Config.Houses[house].tier = tier
+        MySQL.update('UPDATE houselocations SET tier = ? WHERE name = ?', {tier, house})
+        TriggerClientEvent('qb-houses:client:SetHouseTier', -1, house, tier)
+        print("^3[qb-houses] ^5"..Player.PlayerData.name.." has changed tier of "..house.." to Tier: "..tier.."^7")
+        TriggerEvent('qb-log:server:CreateLog', 'playerhouses', "Tier Change", 'black', "**"..Player.PlayerData.name.."** has changed tier of **"..house.."** to Tier: "..tier)
+        TriggerClientEvent('QBCore:Notify', src, "changed tier of "..house.." to Tier: "..tier, "success")
+
+    else
+        TriggerClientEvent('QBCore:Notify', src, "Invalid house name..", "error")
+    end
+end)
+
 QBCore.Functions.CreateCallback('qb-phone:server:MeosGetPlayerHouses', function(_, cb, input)
     if input then
         local search = escape_sqli(input)
@@ -671,5 +695,29 @@ QBCore.Functions.CreateCallback('qb-phone:server:MeosGetPlayerHouses', function(
         end
     else
         cb(nil)
+    end
+end)
+
+QBCore.Commands.Add("deletehouse", "Delete House (Real Estate Only)", {}, false, function(source)
+    local src = source
+    local Player = QBCore.Functions.GetPlayer(src)
+    if Player.PlayerData.job.name == "realestate" then
+        TriggerClientEvent("qb-houses:client:DeleteHouse", src)
+    else
+        TriggerClientEvent('QBCore:Notify', src, Lang:t("error.realestate_only"), "error")
+    end 
+end)
+RegisterNetEvent("qb-houses:server:DeleteHouse", function(house)
+    local src = source
+    local Player = QBCore.Functions.GetPlayer(src)
+    if Player.PlayerData.job.name == "realestate" then
+        if not isHouseOwned(house) then
+            MySQL.Async.execute('DELETE FROM `houselocations` WHERE name = ?', {house})  
+            Config.Houses[house] = nil
+            TriggerClientEvent('qb-houses:client:removeMenuForAgent', src, house)
+            TriggerClientEvent("qb-houses:client:setHouseConfig", -1, Config.Houses)    
+        else
+            TriggerClientEvent('QBCore:Notify', src, "House is Owned")
+        end
     end
 end)

@@ -341,6 +341,97 @@ local function openContract(bool)
     })
 end
 
+RegisterNetEvent('qb-houses:client:OpenRealEstateMenu', function()
+    exports['qb-menu']:openMenu({
+        {
+            header = "Dynasty 8",
+            txt = "ESC or click to close",
+            icon = 'fas fa-angle-left',
+            params = {
+                event = "qb-menu:closeMenu",
+            }
+        },
+        {
+            header = 'Housing Actions',
+            txt = "Change existing houses",
+            icon = 'fas fa-building',
+            params = {
+                event = 'qb-realestate:client:HousingActions'
+            }
+        }
+    })
+end)
+
+RegisterNetEvent('qb-realestate:client:HousingActions', function()
+    exports['qb-menu']:openMenu({
+        {
+            header = "Go Back",
+            txt = "ESC to close",
+            icon = 'fas fa-angle-left',
+            params = {
+                event = "qb-houses:client:OpenRealEstateMenu",
+            }
+        },
+        {
+            header = 'Tier Change',
+            txt = "",
+            icon = 'fas fa-retweet',
+            params = {
+                event = 'qb-houses:client:TierChange'
+            }
+        }
+    })
+end)
+
+RegisterNetEvent('qb-houses:client:TierChange', function()
+    local dialog = exports['qb-input']:ShowInput({
+        header = "Change House Tier",
+        submitText = "Submit",
+        inputs = {
+            {
+                text = 'House Label',
+                name = "house",
+                type = "text",
+                isRequired = true,
+                default = "",
+            },
+            {
+                text = "New Tier",
+                name = "tier",
+                type = "number",
+                isRequired = true,
+                default = "",
+            }
+        }
+    })
+    if not dialog or not next(dialog) then return end
+    TriggerServerEvent('qb-houses:server:TierChange', dialog.house, tonumber(dialog.tier))
+end)
+
+RegisterNetEvent('qb-houses:client:SetHouseTier', function(house, tier)
+    while not LocalPlayer.state.isLoggedIn do Wait(10) end
+    Config.Houses[house].tier = tier
+end)
+
+RegisterNetEvent("qb-houses:client:DeleteHouse", function()
+    if QBCore.Functions.GetPlayerData().job.name == 'realestate' then
+        if ClosestHouse ~= nil then
+            TriggerServerEvent("qb-houses:server:DeleteHouse", ClosestHouse)
+        else
+            QBCore.Functions.Notify('No House Nearby', 'error')
+        end
+    else
+        QBCore.Functions.Notify('Real Estate Only', 'error')
+    end
+end)
+RegisterNetEvent("qb-houses:client:removeMenuForAgent", function(house) -- This was to make sure the entry menu went away because the default QB-Houses uses that instead of targeting
+    if ClosestHouse ~= nil then
+        if ClosestHouse == house then
+            ClosestHouse = nil    
+        end
+    end
+end)
+
 local function GetClosestPlayer()
     local closestPlayers = QBCore.Functions.GetPlayersFromCoords()
     local closestDistance = -1
